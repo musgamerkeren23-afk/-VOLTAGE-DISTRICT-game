@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Survivals: The Entity's Domain (Match Loop Edition)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body, html { width: 100%; height: 100%; overflow: hidden; background-color: #050508; font-family: 'Segoe UI', sans-serif; color: #fff; }
+    #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+    #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
+    .interactive { pointer-events: auto; }
+
+    /* LOBBY SCREEN */
+    #lobby-screen {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(8, 8, 12, 0.85); backdrop-filter: blur(8px);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 20;
+    }
+    .title-box { text-align: center; margin-bottom: 2rem; }
+    .title-box h1 { font-size: 3.5rem; letter-spacing: 6px; color: #ff3344; text-shadow: 0 0 20px rgba(255, 51, 68, 0.6); font-weight: 900; }
+    
+    .lobby-card {
+      background: rgba(20, 20, 30, 0.9); border: 1px solid rgba(255, 51, 68, 0.3);
+      border-radius: 12px; padding: 2rem; width: 380px; display: flex; flex-direction: column; gap: 1.2rem; text-align: center;
+    }
+    .input-group { display: flex; flex-direction: column; gap: 0.5rem; text-align: left; }
+    .input-group label { font-size: 0.85rem; color: #888; text-transform: uppercase; }
+    .input-group input { background: #0f0f17; border: 1px solid #333; padding: 0.8rem; border-radius: 6px; color: #fff; outline: none; }
+    
+    .role-select { display: flex; gap: 10px; }
+    .role-btn { flex: 1; padding: 0.8rem; background: #141420; border: 1px solid #333; color: #888; border-radius: 6px; cursor: pointer; text-align: center; }
+    .role-btn.active-survivor { border-color: #00e5ff; color: #00e5ff; background: rgba(0, 229, 255, 0.1); }
+    .role-btn.active-killer { border-color: #ff3344; color: #ff3344; background: rgba(255, 51, 68, 0.1); }
+
+    .btn-start {
+      background: linear-gradient(135deg, #ff3344, #990011); border: none; padding: 1rem;
+      border-radius: 6px; color: white; font-size: 1.2rem; font-weight: bold; cursor: pointer; margin-top: 1rem;
+    }
+
+    /* HUD IN-GAME */
+    #hud { padding: 1.5rem; display: flex; justify-content: space-between; width: 100%; display: none; }
+    .hud-box { background: rgba(10, 10, 15, 0.75); border: 1px solid rgba(255, 255, 255, 0.1); padding: 0.8rem 1.2rem; border-radius: 8px; }
+    .health-bar-container { width: 180px; height: 12px; background: #222; border-radius: 6px; overflow: hidden; margin-top: 4px; }
+    .health-bar-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #00e5ff, #0088ff); transition: width 0.3s; }
+
+    .round-timer { font-size: 1.5rem; font-weight: bold; color: #ffaa00; text-align: center; }
+
+    /* CINEMATIC OVERLAY */
+    #cinematic-overlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 30; pointer-events: none; opacity: 0; transition: opacity 0.8s ease; background: rgba(0,0,0,0.7);
+    }
+    #cinematic-overlay.active { opacity: 1; }
+    .cinematic-title { font-size: 3rem; font-weight: 900; letter-spacing: 4px; text-transform: uppercase; }
+
+    /* CHAT BOX */
+    #chat-container { position: absolute; bottom: 1.5rem; left: 1.5rem; width: 320px; z-index: 15; display: none; }
+    #chat-messages { height: 120px; overflow-y: auto; background: rgba(0, 0, 0, 0.6); padding: 0.5rem; border-radius: 6px; font-size: 0.85rem; margin-bottom: 6px; }
+    #chat-input { width: 100%; background: rgba(15, 15, 20, 0.8); border: 1px solid #444; border-radius: 4px; padding: 0.4rem; color: #fff; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+
+  <div id="ui-layer">
+    <!-- LOBBY SCREEN -->
+    <div id="lobby-screen" class="interactive">
+      <div class="title-box">
+        <h1>SURVIVALS</h1>
+        <p>THE ENTITY'S DOMAIN</p>
+      </div>
+
+      <div class="lobby-card">
+        <div class="input-group">
+          <label>Nama Player</label>
+          <input type="text" id="player-name-input" value="Spark_Rider">
+        </div>
+
+        <div class="input-group">
+          <label>Pilih Peran Utama</label>
+          <div class="role-select">
+            <div id="role-survivor" class="role-btn active-survivor" onclick="selectRole('survivor')">SURVIVOR</div>
+            <div id="role-killer" class="role-btn" onclick="selectRole('killer')">KILLER</div>
+          </div>
+        </div>
+
+        <button class="btn-start" onclick="readyToPlay()">SIAP (READY)</button>
+        <div id="lobby-status" style="font-size: 0.85rem; color: #aaa;">Status: Menunggu Pemain...</div>
+      </div>
+    </div>
+
+    <!-- HUD IN-GAME -->
+    <div id="hud">
+      <div class="hud-box">
+        <div id="hud-player-name" style="font-weight: bold; color: #00e5ff;">Player</div>
+        <div id="hud-role" style="font-size: 0.8rem; color: #aaa;">Role: Survivor</div>
+        <div class="health-bar-container"><div id="health-fill" class="health-bar-fill"></div></div>
+      </div>
+
+      <div class="hud-box round-timer">
+        SISA WAKTU<br>
+        <span id="match-timer-text" style="color: #fff;">03:00</span>
+      </div>
+
+      <div class="hud-box" style="color:#ffaa00; font-weight:bold;">GENERATOR: <span id="gen-count" style="color:#00e5ff;">0 / 3</span></div>
+    </div>
+
+    <!-- CHAT BOX -->
+    <div id="chat-container" class="interactive">
+      <div id="chat-messages"><div style="color: #ffaa00;"><i>System: Selamat datang di Lobby! Klik READY untuk memulai round.</i></div></div>
+      <input type="text" id="chat-input" placeholder="Tekan Enter untuk kirim chat..." onkeydown="handleChatKey(event)">
+    </div>
+
+    <!-- CINEMATIC INTRO / OUTRO / REST -->
+    <div id="cinematic-overlay">
+      <div id="cinematic-title" class="cinematic-title"></div>
+      <div id="cinematic-subtitle" style="font-size: 1.5rem; color: #eee; margin-top: 10px;"></div>
+    </div>
+  </div>
+
+  <script>
+    let scene, camera, renderer, playerMesh, killerMesh;
+    let selectedRole = 'survivor';
+    let playerName = 'Spark_Rider';
+    let gameState = 'LOBBY'; // LOBBY, COUNTDOWN, INTRO, PLAYING, OUTRO, REST
+    
+    let matchTimeLeft = 180; // 3 Menit Per Match
+    let timerInterval = null;
+
+    const keys = { w: false, a: false, s: false, d: false, e: false };
+    
+    let playerStats = { x: 0, z: 12, hp: 100, speed: 0.15 };
+    let killerStats = { x: 0, z: -15 };
+    let generators = [
+      { x: -12, z: -5, done: false, progress: 0, mesh: null },
+      { x: 12, z: -5, done: false, progress: 0, mesh: null },
+      { x: 0, z: 8, done: false, progress: 0, mesh: null }
+    ];
+
+    function initThree() {
+      const container = document.getElementById('canvas-container');
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x05050a);
+      scene.fog = new THREE.FogExp2(0x05050a, 0.04);
+
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      container.appendChild(renderer.domElement);
+
+      const ambientLight = new THREE.AmbientLight(0x1a1a2e, 0.8);
+      scene.add(ambientLight);
+      const dirLight = new THREE.DirectionalLight(0x334466, 1.2);
+      dirLight.position.set(20, 40, 20);
+      dirLight.castShadow = true;
+      scene.add(dirLight);
+
+      buildArena();
+      camera.position.set(0, 18, 28);
+      camera.lookAt(0, 0, 0);
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      setupInputs();
+      animate();
+    }
+
+    function buildArena() {
+      const floorGeo = new THREE.PlaneGeometry(60, 60);
+      const floorMat = new THREE.MeshStandardMaterial({ color: 0x111118 });
+      const floor = new THREE.Mesh(floorGeo, floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      floor.receiveShadow = true;
+      scene.add(floor);
+
+      generators.forEach((gen) => {
+        const genGroup = new THREE.Group();
+        const base = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2), new THREE.MeshStandardMaterial({ color: 0x333344 }));
+        base.position.y = 1.5; base.castShadow = true;
+        genGroup.add(base);
+
+        const core = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1), new THREE.MeshBasicMaterial({ color: 0xffaa00 }));
+        core.position.y = 2.5; genGroup.add(core);
+
+        genGroup.position.set(gen.x, 0, gen.z);
+        scene.add(genGroup);
+        gen.mesh = genGroup;
+      });
+
+      // SURVIVOR
+      playerMesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.6, 1.2, 4, 8), new THREE.MeshStandardMaterial({ color: 0x0088ff }));
+      playerMesh.position.set(playerStats.x, 1.2, playerStats.z);
+      scene.add(playerMesh);
+
+      // KILLER
+      killerMesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.8, 1.8, 4, 8), new THREE.MeshStandardMaterial({ color: 0x110005 }));
+      killerMesh.position.set(killerStats.x, 1.6, killerStats.z);
+      scene.add(killerMesh);
+    }
+
+    function selectRole(role) {
+      selectedRole = role;
+      document.getElementById('role-survivor').className = role === 'survivor' ? 'role-btn active-survivor' : 'role-btn';
+      document.getElementById('role-killer').className = role === 'killer' ? 'role-btn active-killer' : 'role-btn';
+    }
+
+    // SYSTEM ROUND & TIMER
+    function readyToPlay() {
+      playerName = document.getElementById('player-name-input').value || 'Player';
+      document.getElementById('lobby-status').innerText = 'Menyiapkan Match... (3 Detik)';
+      document.getElementById('lobby-status').style.color = '#00e5ff';
+
+      setTimeout(() => {
+        startRoundSequence();
+      }, 3000);
+    }
+
+    function startRoundSequence() {
+      document.getElementById('lobby-screen').style.display = 'none';
+      document.getElementById('hud').style.display = 'flex';
+      document.getElementById('chat-container').style.display = 'block';
+      document.getElementById('hud-player-name').innerText = playerName;
+
+      // Reset Match State
+      playerStats.hp = 100;
+      playerStats.x = 0; playerStats.z = 12;
+      killerStats.x = 0; killerStats.z = -15;
+      document.getElementById('health-fill').style.width = '100%';
+      generators.forEach(g => {
+        g.done = false; g.progress = 0;
+        g.mesh.children[1].material.color.setHex(0xffaa00);
+      });
+      document.getElementById('gen-count').innerText = "0 / 3";
+
+      // Intro Phase
+      playIntroCutscene();
+    }
+
+    function playIntroCutscene() {
+      gameState = 'INTRO';
+      const overlay = document.getElementById('cinematic-overlay');
+      const title = document.getElementById('cinematic-title');
+      const subtitle = document.getElementById('cinematic-subtitle');
+      
+      const killerName = selectedRole === 'killer' ? playerName : 'Bot_Entity';
+      title.innerText = `${killerName} IS THE KILLER!`;
+      title.style.color = "#ff3344";
+      subtitle.innerText = "ROUND DIMULAI! PERBAIKI GENERATOR / HABISI SURVIVOR!";
+      overlay.classList.add('active');
+
+      setTimeout(() => {
+        overlay.classList.remove('active');
+        gameState = 'PLAYING';
+        startMatchTimer();
+      }, 3500);
+    }
+
+    function startMatchTimer() {
+      matchTimeLeft = 180; // 3 Menit
+      updateTimerDisplay();
+
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        if (gameState === 'PLAYING') {
+          matchTimeLeft--;
+          updateTimerDisplay();
+
+          if (matchTimeLeft <= 0) {
+            clearInterval(timerInterval);
+            endRound('killer_time'); // Waktu habis, Killer Menang
+          }
+        }
+      }, 1000);
+    }
+
+    function updateTimerDisplay() {
+      const mins = Math.floor(matchTimeLeft / 60);
+      const secs = matchTimeLeft % 60;
+      document.getElementById('match-timer-text').innerText = 
+        `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function endRound(winner) {
+      gameState = 'OUTRO';
+      clearInterval(timerInterval);
+
+      const overlay = document.getElementById('cinematic-overlay');
+      const title = document.getElementById('cinematic-title');
+      const subtitle = document.getElementById('cinematic-subtitle');
+
+      if (winner === 'survivor') {
+        title.innerText = "SURVIVORS ESCAPED!";
+        title.style.color = "#00e5ff";
+        subtitle.innerText = "Semua Generator Selesai!";
+      } else {
+        title.innerText = "THE ENTITY PREVAILED!";
+        title.style.color = "#ff3344";
+        subtitle.innerText = winner === 'killer_time' ? "Waktu Habis! Survivor Gagal Kabur!" : "Semua Survivor Di-Eliminasi!";
+      }
+
+      overlay.classList.add('active');
+
+      // Rest Phase (Waktu Istirahat 8 Detik Sebelum Kembali ke Lobby)
+      setTimeout(() => {
+        gameState = 'REST';
+        title.innerText = "WAKTU ISTIRAHAT";
+        title.style.color = "#ffaa00";
+        subtitle.innerText = "Kembali ke Lobby dalam 5 detik...";
+
+        setTimeout(() => {
+          overlay.classList.remove('active');
+          document.getElementById('hud').style.display = 'none';
+          document.getElementById('lobby-screen').style.display = 'flex';
+          document.getElementById('lobby-status').innerText = 'Match Selesai. Klik READY untuk main lagi!';
+          document.getElementById('lobby-status').style.color = '#aaa';
+          gameState = 'LOBBY';
+        }, 5000);
+      }, 4000);
+    }
+
+    function setupInputs() {
+      window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true; });
+      window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false; });
+    }
+
+    function handleChatKey(e) {
+      if (e.key === 'Enter') {
+        const input = document.getElementById('chat-input');
+        if (input.value.trim()) {
+          const container = document.getElementById('chat-messages');
+          container.innerHTML += `<div><b>${playerName}:</b> ${input.value}</div>`;
+          input.value = '';
+          container.scrollTop = container.scrollHeight;
+        }
+      }
+    }
+
+    function update() {
+      if (gameState !== 'PLAYING') return;
+
+      let dx = 0, dz = 0;
+      if (keys.w) dz -= 1; if (keys.s) dz += 1;
+      if (keys.a) dx -= 1; if (keys.d) dx += 1;
+
+      if (dx !== 0 || dz !== 0) {
+        playerStats.x += dx * playerStats.speed;
+        playerStats.z += dz * playerStats.speed;
+        playerMesh.position.x = playerStats.x;
+        playerMesh.position.z = playerStats.z;
+      }
+
+      camera.position.set(playerMesh.position.x, 12, playerMesh.position.z + 14);
+      camera.lookAt(playerMesh.position.x, 1, playerMesh.position.z);
+
+      // AI Killer
+      const kDx = playerStats.x - killerStats.x;
+      const kDz = playerStats.z - killerStats.z;
+      const dist = Math.sqrt(kDx * kDx + kDz * kDz);
+      if (dist > 1.5) {
+        killerStats.x += (kDx / dist) * 0.08;
+        killerStats.z += (kDz / dist) * 0.08;
+        killerMesh.position.x = killerStats.x;
+        killerMesh.position.z = killerStats.z;
+      } else {
+        // Attack
+        playerStats.hp -= 0.4;
+        document.getElementById('health-fill').style.width = `${Math.max(0, playerStats.hp)}%`;
+        if (playerStats.hp <= 0) {
+          endRound('killer');
+        }
+      }
+
+      // Repair (E)
+      if (keys.e) {
+        generators.forEach(gen => {
+          if (!gen.done && Math.hypot(playerStats.x - gen.x, playerStats.z - gen.z) < 3) {
+            gen.progress += 0.5;
+            if (gen.progress >= 100) {
+              gen.done = true;
+              gen.mesh.children[1].material.color.setHex(0x00ff66);
+              
+              const doneCount = generators.filter(g => g.done).length;
+              document.getElementById('gen-count').innerText = `${doneCount} / 3`;
+              
+              if (doneCount === 3) {
+                endRound('survivor');
+              }
+            }
+          }
+        });
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      update();
+      renderer.render(scene, camera);
+    }
+
+    window.onload = initThree;
+  </script>
+</body>
+</html>
