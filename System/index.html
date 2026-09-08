@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voltage District 3D</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+
+  <div id="ui-layer">
+    <!-- LOBBY -->
+    <div id="lobby-screen" class="interactive">
+      <h1>VOLTAGE DISTRICT</h1>
+      <div class="lobby-card">
+        <p>Multiplayer Survival 3D</p>
+        <button class="btn-start" onclick="readyToPlay()">MASUK ARENA</button>
+      </div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud">
+      <div class="hud-box player-info">PLAYER: Spark (Survivor)</div>
+      <div class="hud-box gen-info">GENERATOR: <span id="gen-count">0/3</span></div>
+    </div>
+
+    <!-- CINEMATIC OVERLAY -->
+    <div id="cinematic-overlay">
+      <h1 id="cine-title">THE ENTITY IS HERE</h1>
+      <p id="cine-sub">Lari dan Perbaiki Generator!</p>
+    </div>
+  </div>
+
+  <!-- SCRIPT UTAMA PANGGIL KODE JS -->
+  <script src="script.js"></script>
+</body>
+</html>
