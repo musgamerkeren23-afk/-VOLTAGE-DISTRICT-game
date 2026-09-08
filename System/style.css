@@ -1,0 +1,141 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+body, html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #050508;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #fff;
+}
+
+#canvas-container {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+#ui-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.interactive {
+  pointer-events: auto;
+}
+
+#lobby-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(8, 8, 12, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+#lobby-screen h1 {
+  color: #ff3344;
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+  letter-spacing: 2px;
+}
+
+.lobby-card {
+  background: #141420;
+  border: 1px solid #ff3344;
+  border-radius: 12px;
+  padding: 2rem;
+  width: 320px;
+  text-align: center;
+}
+
+.lobby-card p {
+  margin-bottom: 15px;
+  color: #aaa;
+}
+
+.btn-start {
+  background: #ff3344;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 6px;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.btn-start:hover {
+  background: #cc2233;
+}
+
+#hud {
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  display: none;
+}
+
+.hud-box {
+  background: rgba(0, 0, 0, 0.75);
+  padding: 10px 15px;
+  border-radius: 6px;
+  font-weight: bold;
+}
+
+.player-info { color: #00e5ff; }
+.gen-info { color: #ffaa00; }
+
+#cinematic-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+  pointer-events: none;
+  opacity: 0;
+  background: rgba(0, 0, 0, 0.8);
+  transition: opacity 0.5s;
+}
+
+#cinematic-overlay.active {
+  opacity: 1;
+}
+
+#cine-title {
+  color: #ff3344;
+  font-size: 2rem;
+  letter-spacing: 3px;
+}
+
+#cine-sub {
+  color: #fff;
+  margin-top: 5px;
+}
