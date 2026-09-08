@@ -3,38 +3,103 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Voltage District 3D</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <title>Entity Realm 3D - Multiplayer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body { background: #05050a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
+    #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; }
+
+    /* LOBBY SCREEN */
+    #lobby-screen {
+      position: absolute; width: 100%; height: 100%;
+      background: rgba(5, 5, 10, 0.95);
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      z-index: 10;
+    }
+    h1 { font-size: 3rem; color: #ff3344; text-shadow: 0 0 20px rgba(255,51,68,0.6); margin-bottom: 20px; }
+    .lobby-box { background: #11111d; padding: 25px; border-radius: 12px; border: 1px solid #22223a; width: 320px; text-align: center; }
+    input { width: 100%; padding: 10px; margin: 10px 0; background: #0a0a12; border: 1px solid #333355; color: #fff; border-radius: 6px; text-align: center; }
+    button { width: 100%; padding: 12px; margin-top: 8px; background: #ff3344; border: none; color: white; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.2s; }
+    button:hover { background: #ff5566; transform: translateY(-2px); }
+    button.sec { background: #00e5ff; color: #000; }
+    button.sec:hover { background: #55efff; }
+
+    /* HUD OVERLAY */
+    #hud {
+      position: absolute; top: 20px; left: 20px; z-index: 5;
+      display: none; flex-direction: column; gap: 12px;
+      background: rgba(10, 10, 20, 0.75); padding: 15px; border-radius: 10px;
+      backdrop-filter: blur(5px); border: 1px solid rgba(255, 255, 255, 0.1);
+      width: 260px;
+    }
+    .hud-title { font-weight: bold; color: #00e5ff; font-size: 0.9rem; margin-bottom: 5px; }
+
+    /* BARS */
+    .bar-container { width: 100%; background: #1a1a2a; border-radius: 6px; height: 14px; overflow: hidden; border: 1px solid #333355; }
+    .bar-fill { height: 100%; width: 100%; transition: width 0.1s linear; }
+    #hp-bar { background: linear-gradient(90deg, #ff3344, #ff6677); }
+    #stamina-bar { background: linear-gradient(90deg, #00e5ff, #77f0ff); }
+
+    /* STATUS GENERATOR & CONTROLS */
+    .info-text { font-size: 0.85rem; color: #aaa; margin-top: 4px; }
+    .controls-hint { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); padding: 8px 16px; border-radius: 20px; font-size: 0.8rem; color: #ccc; pointer-events: none; }
+
+    /* CINEMATIC OVERLAY */
+    #cinematic-overlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center;
+      z-index: 20; opacity: 0; pointer-events: none; transition: opacity 0.5s ease;
+    }
+    #cinematic-overlay.active { opacity: 1; pointer-events: all; }
+    #cine-title { font-size: 3rem; font-weight: 900; letter-spacing: 2px; }
+  </style>
+
+  <!-- Three.js & PeerJS CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.min.js"></script>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body>
 
   <div id="canvas-container"></div>
 
-  <div id="ui-layer">
-    <!-- LOBBY -->
-    <div id="lobby-screen" class="interactive">
-      <h1>VOLTAGE DISTRICT</h1>
-      <div class="lobby-card">
-        <p>Multiplayer Survival 3D</p>
-        <button class="btn-start" onclick="readyToPlay()">MASUK ARENA</button>
-      </div>
-    </div>
-
-    <!-- HUD -->
-    <div id="hud">
-      <div class="hud-box player-info">PLAYER: Spark (Survivor)</div>
-      <div class="hud-box gen-info">GENERATOR: <span id="gen-count">0/3</span></div>
-    </div>
-
-    <!-- CINEMATIC OVERLAY -->
-    <div id="cinematic-overlay">
-      <h1 id="cine-title">THE ENTITY IS HERE</h1>
-      <p id="cine-sub">Lari dan Perbaiki Generator!</p>
+  <!-- LOBBY MULTIPLAYER -->
+  <div id="lobby-screen">
+    <h1>ENTITY REALM</h1>
+    <div class="lobby-box">
+      <p style="font-size:0.85rem; color:#aaa; margin-bottom:10px;">Pilih Mode Bermain:</p>
+      <button class="sec" onclick="createRoom()">BUAT ROOM (Host)</button>
+      <hr style="border: 0.5px solid #333; margin: 15px 0;">
+      <input type="text" id="room-input" placeholder="Masukkan ID Room">
+      <button onclick="joinRoom()">GABUNG ROOM</button>
+      <p id="room-status" style="font-size:0.8rem; color:#ffcc00; margin-top:10px;"></p>
     </div>
   </div>
 
-  <!-- SCRIPT UTAMA PANGGIL KODE JS -->
+  <!-- HUD GAME -->
+  <div id="hud">
+    <div>
+      <div class="hud-title">HEALTH (HP)</div>
+      <div class="bar-container"><div id="hp-bar" class="bar-fill"></div></div>
+    </div>
+    <div>
+      <div class="hud-title">STAMINA</div>
+      <div class="bar-container"><div id="stamina-bar" class="bar-fill"></div></div>
+    </div>
+    <div style="margin-top: 5px;">
+      <div class="info-text">Generator Selesai: <b id="gen-count" style="color:#00e5ff">0/3</b></div>
+      <div class="info-text">Pemain Terhubung: <b id="peer-count" style="color:#00ff66">1</b></div>
+    </div>
+  </div>
+
+  <div class="controls-hint">
+    <b>WASD</b> = Jalan | <b>Q (Tahan)</b> = Lari | <b>Panah</b> = Kamera | <b>E</b> = Perbaiki Generator
+  </div>
+
+  <div id="cinematic-overlay">
+    <h2 id="cine-title">ROUND DIMULAI</h2>
+    <p id="cine-sub" style="color:#aaa; margin-top:10px;"></p>
+  </div>
+
   <script src="script.js"></script>
 </body>
 </html>
